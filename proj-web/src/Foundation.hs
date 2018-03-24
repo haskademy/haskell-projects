@@ -1,24 +1,29 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ExplicitForAll        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE ExplicitForAll #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
 
 module Foundation where
 
-import Import.NoFoundation
-import Database.Persist.Sql (ConnectionPool, runSqlPool)
-import Text.Hamlet          (hamletFile)
-import Text.Jasmine         (minifym)
+import           Import.NoFoundation
 
-import Yesod.Default.Util   (addStaticContentExternal)
-import Yesod.Core.Types     (Logger)
-import qualified Yesod.Core.Unsafe as Unsafe
-import qualified Data.CaseInsensitive as CI
-import qualified Data.Text.Encoding as TE
+import qualified Data.CaseInsensitive     as CI
+import qualified Data.Text.Encoding       as TE
+import           Database.Persist.Sql     (ConnectionPool, runSqlPool)
+import           Text.Hamlet              (hamletFile)
+import           Text.Jasmine             (minifym)
+import           Yesod.Auth.Dummy
+import           Yesod.Auth.OAuth2.Github
+import           Yesod.Auth.OpenId        (IdentifierType (Claimed), authOpenId)
+import           Yesod.Core.Types         (Logger)
+import qualified Yesod.Core.Unsafe        as Unsafe
+import           Yesod.Default.Util       (addStaticContentExternal)
+
+import           Proj.Models
 
 -- | The foundation datatype for your application. This can be a good place to
 -- keep settings and values requiring initialization before your application
@@ -33,8 +38,8 @@ data App = App
     }
 
 data MenuItem = MenuItem
-    { menuItemLabel :: Text
-    , menuItemRoute :: Route App
+    { menuItemLabel          :: Text
+    , menuItemRoute          :: Route App
     , menuItemAccessCallback :: Bool
     }
 
@@ -70,7 +75,7 @@ instance Yesod App where
     -- see: https://github.com/yesodweb/yesod/wiki/Overriding-approot
     approot = ApprootRequest $ \app req ->
         case appRoot $ appSettings app of
-            Nothing -> getApprootText guessApproot app req
+            Nothing   -> getApprootText guessApproot app req
             Just root -> root
 
     -- Store session data on the client in encrypted cookies,
@@ -127,9 +132,9 @@ instance Yesod App where
     authRoute _ = Nothing
 
     -- Routes not requiring authentication.
-    isAuthorized HomeR _ = return Authorized
-    isAuthorized FaviconR _ = return Authorized
-    isAuthorized RobotsR _ = return Authorized
+    isAuthorized HomeR _       = return Authorized
+    isAuthorized FaviconR _    = return Authorized
+    isAuthorized RobotsR _     = return Authorized
     isAuthorized (StaticR _) _ = return Authorized
 
     -- This function creates static content files in the static folder
@@ -163,7 +168,7 @@ instance Yesod App where
 -- Define breadcrumbs.
 instance YesodBreadcrumbs App where
   breadcrumb HomeR = return ("Home", Nothing)
-  breadcrumb  _ = return ("home", Nothing)
+  breadcrumb  _    = return ("home", Nothing)
 
 -- How to run database actions.
 instance YesodPersist App where
@@ -174,6 +179,35 @@ instance YesodPersist App where
 
 instance YesodPersistRunner App where
     getDBRunner = defaultGetDBRunner appConnPool
+
+instance YesodAuth App where
+    type AuthId App = UserId
+
+    -- Where to send a user after successful login
+    loginDest _ = HomeR
+    -- Where to send a user after logout
+    logoutDest _ = HomeR
+    -- Override the above two destinations when a Referer: header is present
+    redirectToReferer _ = True
+
+    authenticate creds =
+        pure (ServerError "not implemented yet")
+
+    -- You can add other plugins like Google Email, email or OAuth here
+    authPlugins app =
+        [ authOpenId Claimed []
+        , oauth2Github appGithubClientId appGithubSecret
+        ] ++ extraAuthPlugins
+        -- Enable authDummy login if enabled.
+        where
+          extraAuthPlugins = [authDummy | appAuthDummyLogin ]
+          AppSettings{..} = appSettings app
+
+
+    authHttpManager = getHttpManager
+
+
+instance YesodAuthPersist App
 
 -- This instance is required to use forms. You can modify renderMessage to
 -- achieve customized and internationalized form validation messages.

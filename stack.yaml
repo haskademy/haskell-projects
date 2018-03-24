@@ -4,4 +4,6 @@ packages:
 - proj
 - proj-web
 
-extra-deps: []
+extra-deps:
+- yesod-auth-oauth2-0.4.0.1
+

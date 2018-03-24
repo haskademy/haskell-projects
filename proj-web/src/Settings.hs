@@ -62,6 +62,9 @@ data AppSettings = AppSettings
 
     , appAuthDummyLogin         :: Bool
     -- ^ Indicate if auth dummy login should be enabled.
+
+    , appGithubClientId         :: Text
+    , appGithubSecret           :: Text
     }
 
 instance FromJSON AppSettings where
@@ -91,6 +94,8 @@ instance FromJSON AppSettings where
         appAnalytics              <- o .:? "analytics"
 
         appAuthDummyLogin         <- o .:? "auth-dummy-login"      .!= dev
+        appGithubSecret <- o .:? "github-secret" .!= ""
+        appGithubClientId <- o .:? "github-client-id" .!= ""
 
         return AppSettings {..}
 
