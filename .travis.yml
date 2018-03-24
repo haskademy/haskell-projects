@@ -27,6 +27,9 @@ addons:
       - postgresql-server-dev-all
       - postgresql-client
 
+services:
+    - postgresql
+
 before_install:
 # Download and unpack the stack executable
 - mkdir -p ~/.local/bin
