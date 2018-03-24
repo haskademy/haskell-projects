@@ -42,9 +42,23 @@ Project
     name        Text
     created     UTCTime
     description Text
+    creater     UserId
 
     deriving Eq Show
 
+-- a join table for projects and mentors
+Mentorship
+    project ProjectId
+    mentor  MentorId
+
+    deriving Eq Show
+
+-- a join table for projects and learners
+Apprenticeship
+    learner LearnerId
+    project ProjectId
+
+    deriving Eq Show
 |]
 
 -- | A 'Profile' is not something that exists in the database. It is the
