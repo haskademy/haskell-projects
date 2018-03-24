@@ -1,0 +1,7 @@
+resolver: lts-10.10
+
+packages:
+- proj
+- proj-web
+
+extra-deps: []

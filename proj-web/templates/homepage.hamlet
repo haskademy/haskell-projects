@@ -1,0 +1,9 @@
+<div .masthead>
+    <div .container>
+        <div .row>
+            <h1 .header>
+                Haskell Projects
+            <h2>
+                Connecting Mentors and Learners
+            <a href="http://www.yesodweb.com/book/" .btn.btn-info.btn-lg>
+                Read the Yesod Book
