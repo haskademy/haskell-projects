@@ -24,7 +24,7 @@ addons:
   apt:
     packages:
       - libgmp-dev
-      - postgresql
+      - postgresql-server-dev-all
       - postgresql-client
 
 before_install:
