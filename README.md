@@ -1,5 +1,7 @@
 # `haskell-projects`
 
+[![Build Status](https://travis-ci.org/haskademy/haskell-projects.svg?branch=master)](https://travis-ci.org/haskademy/haskell-projects)
+
 A tutorial Haskell project for connecting potential Haskell projects, mentors, and learners.
 
 ## Where are the projects?

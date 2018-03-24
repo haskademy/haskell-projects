@@ -24,6 +24,8 @@ addons:
   apt:
     packages:
       - libgmp-dev
+      - postgresql
+      - postresql-client
 
 before_install:
 # Download and unpack the stack executable
