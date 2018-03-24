@@ -21,9 +21,22 @@ description:         Please see the README on Github at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- persistent
+- persistent-template
+- text
+- time
 
 library:
   source-dirs: src
+  ghc-options: -Wall -Wcompat -Wincomplete-record-updates -Wincomplete-uni-patterns -Wredundant-constraints -Werror
+  default-extensions:
+      - FlexibleContexts
+      - FlexibleInstances
+      - GADTs
+      - GeneralizedNewtypeDeriving
+      - MultiParamTypeClasses
+      - ScopedTypeVariables
+      - TypeApplications
 
 tests:
   proj-test:
