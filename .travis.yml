@@ -39,7 +39,7 @@ before_install:
 install:
 # Build dependencies
 - stack --no-terminal --install-ghc test --only-dependencies
-- echo "CREATE USER proj-web_test WITH PASSWORD 'proj-web';" | psql postgres
+- echo "CREATE USER \"proj-web_test\" WITH PASSWORD 'proj-web';" | psql postgres
 - createdb --owner proj-web_test proj-web_test
 
 script:
