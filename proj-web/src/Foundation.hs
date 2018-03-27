@@ -214,7 +214,7 @@ instance YesodAuth App where
     -- Override the above two destinations when a Referer: header is present
     redirectToReferer _ = True
 
-    authenticate creds = do
+    authenticate creds | credsPlugin creds == "github" = do
         let muserId = do
                 resp <- getUserResponse creds
                 resp ^? _Object . ix "id" . _Integral
@@ -246,6 +246,25 @@ instance YesodAuth App where
                                     userId
                                 }
                             pure (Authenticated userId)
+    authenticate creds | credsPlugin creds == "dummy" = do
+        muser <- runDB $ selectFirst [ UserName ==. credsIdent creds ] []
+        case muser of
+            Nothing -> runDB $ do
+                now <- liftIO getCurrentTime
+                userId <- insert User
+                    { userName = credsIdent creds
+                    , userCreated = now
+                    , userUpdated = now
+                    }
+                insert OauthLogin
+                    { oauthLoginProvider =
+                        "dummy"
+                    , oauthLoginUser =
+                        userId
+                    }
+                pure (Authenticated userId)
+            Just (Entity userId _) ->
+                pure (Authenticated userId)
 
     -- You can add other plugins like Google Email, email or OAuth here
     authPlugins App{..} =
