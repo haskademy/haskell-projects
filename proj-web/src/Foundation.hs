@@ -113,11 +113,11 @@ instance Yesod App where
                     , menuItemRoute = HomeR
                     , menuItemAccessCallback = True
                     }
---                , NavbarLeft $ MenuItem
---                    { menuItemLabel = "Profile"
---                    , menuItemRoute = ProfileR
---                    , menuItemAccessCallback = isJust muser
---                    }
+                , NavbarLeft MenuItem
+                    { menuItemLabel = "Profile"
+                    , menuItemRoute = ProfileR
+                    , menuItemAccessCallback = isJust muser
+                    }
                 , NavbarRight MenuItem
                     { menuItemLabel = "Login"
                     , menuItemRoute = AuthR LoginR
@@ -202,6 +202,8 @@ instance Yesod App where
 instance YesodBreadcrumbs App where
   breadcrumb = \case
     HomeR -> return ("Home", Nothing)
+    ProfileR -> return ("Profile", Just HomeR)
+    EditProfileR -> return ("Edit", Just ProfileR)
     _ -> return ("Home", Nothing)
 
 -- How to run database actions.

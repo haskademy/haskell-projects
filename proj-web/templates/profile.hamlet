@@ -12,5 +12,5 @@
             <li>
                 You last updated your profile on #{tshow (userUpdated user)}
             <li>
-                <a href @{EditProfileR}>
+                <a href=@{ EditProfileR }>
                     Edit your profile
