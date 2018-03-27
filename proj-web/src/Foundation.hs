@@ -1,4 +1,5 @@
 {-# LANGUAGE ExplicitForAll        #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -13,15 +14,18 @@ import           Import.NoFoundation
 
 import qualified Data.CaseInsensitive     as CI
 import qualified Data.Text.Encoding       as TE
-import           Database.Persist.Sql     (ConnectionPool, runSqlPool)
+import           Database.Persist.Sql
 import           Text.Hamlet              (hamletFile)
 import           Text.Jasmine             (minifym)
 import           Yesod.Auth.Dummy
 import           Yesod.Auth.OAuth2.Github
+import           Yesod.Auth.OAuth2 (getUserResponse)
 import           Yesod.Auth.OpenId        (IdentifierType (Claimed), authOpenId)
 import           Yesod.Core.Types         (Logger)
 import qualified Yesod.Core.Unsafe        as Unsafe
 import           Yesod.Default.Util       (addStaticContentExternal)
+import Control.Lens
+import Data.Aeson.Lens
 
 import           Proj.Models
 
@@ -97,6 +101,7 @@ instance Yesod App where
         master <- getYesod
         mmsg <- getMessage
 
+        muser <- maybeAuthPair
         mcurrentRoute <- getCurrentRoute
 
         -- Get the breadcrumbs, as defined in the YesodBreadcrumbs instance.
@@ -104,10 +109,25 @@ instance Yesod App where
 
         -- Define the menu items of the header.
         let menuItems =
-                [ NavbarLeft $ MenuItem
+                [ NavbarLeft MenuItem
                     { menuItemLabel = "Home"
                     , menuItemRoute = HomeR
                     , menuItemAccessCallback = True
+                    }
+--                , NavbarLeft $ MenuItem
+--                    { menuItemLabel = "Profile"
+--                    , menuItemRoute = ProfileR
+--                    , menuItemAccessCallback = isJust muser
+--                    }
+                , NavbarRight MenuItem
+                    { menuItemLabel = "Login"
+                    , menuItemRoute = AuthR LoginR
+                    , menuItemAccessCallback = isNothing muser
+                    }
+                , NavbarRight MenuItem
+                    { menuItemLabel = "Logout"
+                    , menuItemRoute = AuthR LogoutR
+                    , menuItemAccessCallback = isJust muser
                     }
                 ]
 
@@ -134,11 +154,11 @@ instance Yesod App where
     -- Routes not requiring authentication.
     isAuthorized route _ =
         case route of
-            HomeR -> return Authorized
-            FaviconR -> return Authorized
-            RobotsR -> return Authorized
+            HomeR     -> return Authorized
+            FaviconR  -> return Authorized
+            RobotsR   -> return Authorized
             StaticR _ -> return Authorized
-            AuthR {} -> return Authorized
+            AuthR {}  -> return Authorized
 
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows
@@ -170,8 +190,9 @@ instance Yesod App where
 
 -- Define breadcrumbs.
 instance YesodBreadcrumbs App where
-  breadcrumb HomeR = return ("Home", Nothing)
-  breadcrumb  _    = return ("home", Nothing)
+  breadcrumb = \case
+    HomeR -> return ("Home", Nothing)
+    _ -> return ("Home", Nothing)
 
 -- How to run database actions.
 instance YesodPersist App where
@@ -193,14 +214,43 @@ instance YesodAuth App where
     -- Override the above two destinations when a Referer: header is present
     redirectToReferer _ = True
 
-    authenticate creds =
-        pure (ServerError "not implemented yet")
+    authenticate creds = do
+        let muserId = do
+                resp <- getUserResponse creds
+                resp ^? _Object . ix "id" . _Integral
+
+        case muserId of
+            Nothing -> do
+                $logError $ "No user ID found in auth request: " <> tshow creds
+                pure (ServerError "The authentication response wasn't quite right.")
+            Just oauthUserId -> do
+                mlogin <- runDB $ get (toSqlKey oauthUserId)
+                case mlogin of
+                    Just oauthLogin ->
+                        pure (Authenticated (oauthLoginUser oauthLogin))
+                    Nothing -> do
+                        runDB $ do
+                            now <- liftIO getCurrentTime
+                            userId <- insert User
+                                { userName =
+                                    "Nameless One"
+                                , userCreated =
+                                    now
+                                , userUpdated =
+                                    now
+                                }
+                            repsert (toSqlKey oauthUserId) OauthLogin
+                                { oauthLoginProvider =
+                                    credsPlugin creds
+                                , oauthLoginUser =
+                                    userId
+                                }
+                            pure (Authenticated userId)
 
     -- You can add other plugins like Google Email, email or OAuth here
     authPlugins App{..} =
-        [ authOpenId Claimed []
-        , oauth2Github appGithubClientId appGithubSecret
-        ] ++ extraAuthPlugins
+        oauth2Github appGithubClientId appGithubSecret
+        : extraAuthPlugins
         -- Enable authDummy login if enabled.
         where
           extraAuthPlugins = [authDummy | appAuthDummyLogin ]
@@ -208,7 +258,6 @@ instance YesodAuth App where
 
 
     authHttpManager = getHttpManager
-
 
 instance YesodAuthPersist App
 
