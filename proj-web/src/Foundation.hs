@@ -129,13 +129,16 @@ instance Yesod App where
         withUrlRenderer $(hamletFile "templates/default-layout-wrapper.hamlet")
 
     -- The page to be redirected to when authentication is required.
-    authRoute _ = Nothing
+    authRoute _ = Just (AuthR LoginR)
 
     -- Routes not requiring authentication.
-    isAuthorized HomeR _       = return Authorized
-    isAuthorized FaviconR _    = return Authorized
-    isAuthorized RobotsR _     = return Authorized
-    isAuthorized (StaticR _) _ = return Authorized
+    isAuthorized route _ =
+        case route of
+            HomeR -> return Authorized
+            FaviconR -> return Authorized
+            RobotsR -> return Authorized
+            StaticR _ -> return Authorized
+            AuthR {} -> return Authorized
 
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows
@@ -194,14 +197,14 @@ instance YesodAuth App where
         pure (ServerError "not implemented yet")
 
     -- You can add other plugins like Google Email, email or OAuth here
-    authPlugins app =
+    authPlugins App{..} =
         [ authOpenId Claimed []
         , oauth2Github appGithubClientId appGithubSecret
         ] ++ extraAuthPlugins
         -- Enable authDummy login if enabled.
         where
           extraAuthPlugins = [authDummy | appAuthDummyLogin ]
-          AppSettings{..} = appSettings app
+          AppSettings{..} = appSettings
 
 
     authHttpManager = getHttpManager
