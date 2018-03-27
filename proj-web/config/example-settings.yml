@@ -38,4 +38,6 @@ database:
   poolsize: "_env:PGPOOLSIZE:10"
 
 copyright: Insert copyright statement here
-#analytics: UA-YOURCODE
+
+github-secret: "_env:HASKPROJ_GITHUB_SECRET:nope"
+github-client-id: "_env:HASKPROJ_GITHUB_CLIENT_ID:nope"

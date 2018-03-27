@@ -1,24 +1,33 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ExplicitForAll        #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE ExplicitForAll #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
 
 module Foundation where
 
-import Import.NoFoundation
-import Database.Persist.Sql (ConnectionPool, runSqlPool)
-import Text.Hamlet          (hamletFile)
-import Text.Jasmine         (minifym)
+import           Import.NoFoundation
 
-import Yesod.Default.Util   (addStaticContentExternal)
-import Yesod.Core.Types     (Logger)
-import qualified Yesod.Core.Unsafe as Unsafe
-import qualified Data.CaseInsensitive as CI
-import qualified Data.Text.Encoding as TE
+import qualified Data.CaseInsensitive     as CI
+import qualified Data.Text.Encoding       as TE
+import           Database.Persist.Sql
+import           Text.Hamlet              (hamletFile)
+import           Text.Jasmine             (minifym)
+import           Yesod.Auth.Dummy
+import           Yesod.Auth.OAuth2.Github
+import           Yesod.Auth.OAuth2 (getUserResponse)
+import           Yesod.Auth.OpenId        (IdentifierType (Claimed), authOpenId)
+import           Yesod.Core.Types         (Logger)
+import qualified Yesod.Core.Unsafe        as Unsafe
+import           Yesod.Default.Util       (addStaticContentExternal)
+import Control.Lens
+import Data.Aeson.Lens
+
+import           Proj.Models
 
 -- | The foundation datatype for your application. This can be a good place to
 -- keep settings and values requiring initialization before your application
@@ -33,8 +42,8 @@ data App = App
     }
 
 data MenuItem = MenuItem
-    { menuItemLabel :: Text
-    , menuItemRoute :: Route App
+    { menuItemLabel          :: Text
+    , menuItemRoute          :: Route App
     , menuItemAccessCallback :: Bool
     }
 
@@ -70,7 +79,7 @@ instance Yesod App where
     -- see: https://github.com/yesodweb/yesod/wiki/Overriding-approot
     approot = ApprootRequest $ \app req ->
         case appRoot $ appSettings app of
-            Nothing -> getApprootText guessApproot app req
+            Nothing   -> getApprootText guessApproot app req
             Just root -> root
 
     -- Store session data on the client in encrypted cookies,
@@ -92,6 +101,7 @@ instance Yesod App where
         master <- getYesod
         mmsg <- getMessage
 
+        muser <- maybeAuthPair
         mcurrentRoute <- getCurrentRoute
 
         -- Get the breadcrumbs, as defined in the YesodBreadcrumbs instance.
@@ -99,10 +109,25 @@ instance Yesod App where
 
         -- Define the menu items of the header.
         let menuItems =
-                [ NavbarLeft $ MenuItem
+                [ NavbarLeft MenuItem
                     { menuItemLabel = "Home"
                     , menuItemRoute = HomeR
                     , menuItemAccessCallback = True
+                    }
+--                , NavbarLeft $ MenuItem
+--                    { menuItemLabel = "Profile"
+--                    , menuItemRoute = ProfileR
+--                    , menuItemAccessCallback = isJust muser
+--                    }
+                , NavbarRight MenuItem
+                    { menuItemLabel = "Login"
+                    , menuItemRoute = AuthR LoginR
+                    , menuItemAccessCallback = isNothing muser
+                    }
+                , NavbarRight MenuItem
+                    { menuItemLabel = "Logout"
+                    , menuItemRoute = AuthR LogoutR
+                    , menuItemAccessCallback = isJust muser
                     }
                 ]
 
@@ -124,13 +149,16 @@ instance Yesod App where
         withUrlRenderer $(hamletFile "templates/default-layout-wrapper.hamlet")
 
     -- The page to be redirected to when authentication is required.
-    authRoute _ = Nothing
+    authRoute _ = Just (AuthR LoginR)
 
     -- Routes not requiring authentication.
-    isAuthorized HomeR _ = return Authorized
-    isAuthorized FaviconR _ = return Authorized
-    isAuthorized RobotsR _ = return Authorized
-    isAuthorized (StaticR _) _ = return Authorized
+    isAuthorized route _ =
+        case route of
+            HomeR     -> return Authorized
+            FaviconR  -> return Authorized
+            RobotsR   -> return Authorized
+            StaticR _ -> return Authorized
+            AuthR {}  -> return Authorized
 
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows
@@ -162,8 +190,9 @@ instance Yesod App where
 
 -- Define breadcrumbs.
 instance YesodBreadcrumbs App where
-  breadcrumb HomeR = return ("Home", Nothing)
-  breadcrumb  _ = return ("home", Nothing)
+  breadcrumb = \case
+    HomeR -> return ("Home", Nothing)
+    _ -> return ("Home", Nothing)
 
 -- How to run database actions.
 instance YesodPersist App where
@@ -174,6 +203,63 @@ instance YesodPersist App where
 
 instance YesodPersistRunner App where
     getDBRunner = defaultGetDBRunner appConnPool
+
+instance YesodAuth App where
+    type AuthId App = UserId
+
+    -- Where to send a user after successful login
+    loginDest _ = HomeR
+    -- Where to send a user after logout
+    logoutDest _ = HomeR
+    -- Override the above two destinations when a Referer: header is present
+    redirectToReferer _ = True
+
+    authenticate creds = do
+        let muserId = do
+                resp <- getUserResponse creds
+                resp ^? _Object . ix "id" . _Integral
+
+        case muserId of
+            Nothing -> do
+                $logError $ "No user ID found in auth request: " <> tshow creds
+                pure (ServerError "The authentication response wasn't quite right.")
+            Just oauthUserId -> do
+                mlogin <- runDB $ get (toSqlKey oauthUserId)
+                case mlogin of
+                    Just oauthLogin ->
+                        pure (Authenticated (oauthLoginUser oauthLogin))
+                    Nothing -> do
+                        runDB $ do
+                            now <- liftIO getCurrentTime
+                            userId <- insert User
+                                { userName =
+                                    "Nameless One"
+                                , userCreated =
+                                    now
+                                , userUpdated =
+                                    now
+                                }
+                            repsert (toSqlKey oauthUserId) OauthLogin
+                                { oauthLoginProvider =
+                                    credsPlugin creds
+                                , oauthLoginUser =
+                                    userId
+                                }
+                            pure (Authenticated userId)
+
+    -- You can add other plugins like Google Email, email or OAuth here
+    authPlugins App{..} =
+        oauth2Github appGithubClientId appGithubSecret
+        : extraAuthPlugins
+        -- Enable authDummy login if enabled.
+        where
+          extraAuthPlugins = [authDummy | appAuthDummyLogin ]
+          AppSettings{..} = appSettings
+
+
+    authHttpManager = getHttpManager
+
+instance YesodAuthPersist App
 
 -- This instance is required to use forms. You can modify renderMessage to
 -- achieve customized and internationalized form validation messages.

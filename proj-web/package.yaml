@@ -44,9 +44,12 @@ dependencies:
 - yaml                   >=0.8     && <0.9
 - yesod                  >=1.4.3   && <1.5
 - yesod-auth             >=1.4.0   && <1.5
+- yesod-auth-oauth2     
 - yesod-core             >=1.4.30  && <1.5
 - yesod-form             >=1.4.0   && <1.5
 - yesod-static           >=1.4.0.3 && <1.6
+- lens-aeson
+- lens
 
 # The library contains all of our application code. The executable
 # defined below is just a thin wrapper.

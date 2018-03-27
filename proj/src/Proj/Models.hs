@@ -8,15 +8,21 @@ import           Data.Text           (Text)
 import           Data.Time           (UTCTime)
 import           Database.Persist    (Entity)
 import           Database.Persist.TH (mkPersist, persistLowerCase, share,
-                                      sqlSettings)
+                                      sqlSettings, mkMigrate)
 
-share [mkPersist sqlSettings] [persistLowerCase|
+share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 
 -- user and user management models
 User
     name    Text
     created UTCTime
     updated UTCTime
+
+    deriving Eq Show
+
+OauthLogin
+    provider Text
+    user     UserId
 
     deriving Eq Show
 
