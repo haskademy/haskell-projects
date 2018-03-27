@@ -41,6 +41,7 @@ install:
 - stack --no-terminal --install-ghc test --only-dependencies
 - echo "CREATE USER \"proj-web\" WITH PASSWORD 'proj-web';" | psql postgres
 - createdb --owner proj-web proj-web_test
+- cp proj-web/config/example-settings.yml proj-web/config/settings.yml
 
 script:
 # Build the package, its tests, and its docs and run the tests
