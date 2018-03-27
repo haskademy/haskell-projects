@@ -7,8 +7,8 @@ module Proj.Models where
 import           Data.Text           (Text)
 import           Data.Time           (UTCTime)
 import           Database.Persist    (Entity)
-import           Database.Persist.TH (mkPersist, persistLowerCase, share,
-                                      sqlSettings, mkMigrate)
+import           Database.Persist.TH (mkMigrate, mkPersist, persistLowerCase,
+                                      share, sqlSettings)
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 
@@ -48,7 +48,7 @@ Project
     name        Text
     created     UTCTime
     description Text
-    creater     UserId
+    creator     UserId
 
     deriving Eq Show
 
