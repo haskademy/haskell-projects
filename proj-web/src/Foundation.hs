@@ -12,20 +12,19 @@ module Foundation where
 
 import           Import.NoFoundation
 
+import           Control.Lens
+import           Data.Aeson.Lens
 import qualified Data.CaseInsensitive     as CI
 import qualified Data.Text.Encoding       as TE
 import           Database.Persist.Sql
 import           Text.Hamlet              (hamletFile)
 import           Text.Jasmine             (minifym)
 import           Yesod.Auth.Dummy
+import           Yesod.Auth.OAuth2        (getUserResponse)
 import           Yesod.Auth.OAuth2.Github
-import           Yesod.Auth.OAuth2 (getUserResponse)
-import           Yesod.Auth.OpenId        (IdentifierType (Claimed), authOpenId)
 import           Yesod.Core.Types         (Logger)
 import qualified Yesod.Core.Unsafe        as Unsafe
 import           Yesod.Default.Util       (addStaticContentExternal)
-import Control.Lens
-import Data.Aeson.Lens
 
 import           Proj.Models
 
@@ -151,14 +150,25 @@ instance Yesod App where
     -- The page to be redirected to when authentication is required.
     authRoute _ = Just (AuthR LoginR)
 
-    -- Routes not requiring authentication.
-    isAuthorized route _ =
+    isAuthorized route _isWrite = do
+        mauth <- maybeAuth
         case route of
-            HomeR     -> return Authorized
-            FaviconR  -> return Authorized
-            RobotsR   -> return Authorized
-            StaticR _ -> return Authorized
-            AuthR {}  -> return Authorized
+            HomeR     ->
+                return Authorized
+            FaviconR  ->
+                return Authorized
+            RobotsR   ->
+                return Authorized
+            StaticR _ ->
+                return Authorized
+            AuthR {}  ->
+                return Authorized
+            ProfileR | isJust mauth ->
+                return Authorized
+            EditProfileR | isJust mauth ->
+                return Authorized
+            _ ->
+                return $ Unauthorized "You must be authorized to view this page."
 
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows
@@ -256,7 +266,7 @@ instance YesodAuth App where
                     , userCreated = now
                     , userUpdated = now
                     }
-                insert OauthLogin
+                _ <- insert OauthLogin
                     { oauthLoginProvider =
                         "dummy"
                     , oauthLoginUser =
@@ -265,6 +275,8 @@ instance YesodAuth App where
                 pure (Authenticated userId)
             Just (Entity userId _) ->
                 pure (Authenticated userId)
+    authenticate _ =
+        pure (ServerError "only github and dummy supported")
 
     -- You can add other plugins like Google Email, email or OAuth here
     authPlugins App{..} =
