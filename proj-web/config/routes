@@ -10,5 +10,6 @@
 / HomeR GET
 
 -- user management pages
-/profile        ProfileR      GET
-/profile/edit   EditProfileR  GET POST
+/profile ProfileR:
+    /       IndexProfileR      GET
+    /edit   EditProfileR  GET POST

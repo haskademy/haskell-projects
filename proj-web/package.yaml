@@ -51,6 +51,8 @@ dependencies:
 - lens-aeson
 - lens
 - blaze-html
+- rowdy
+- rowdy-yesod
 
 # The library contains all of our application code. The executable
 # defined below is just a thin wrapper.
