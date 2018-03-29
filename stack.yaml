@@ -6,6 +6,9 @@ packages:
 
 extra-deps:
 - yesod-auth-oauth2-0.4.0.1
-- ../rowdy/rowdy
-- ../rowdy/rowdy-yesod
+- git: git@github.com:parsonsmatt/rowdy
+  commit: 59f36b9891b0e60c616ba2fe4a8694e0e363c5d6
+  subdirs:
+    - rowdy
+    - rowdy-yesod
 
