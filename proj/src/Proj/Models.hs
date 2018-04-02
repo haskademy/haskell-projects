@@ -76,5 +76,3 @@ data Profile
     , profileMentor  :: Maybe (Entity Mentor)
     , profileAdmin   :: Maybe (Entity Admin)
     } deriving (Eq, Show)
-
-loadProfile

@@ -12,9 +12,10 @@ import           Import
 import           Yesod.Form.Bootstrap3
 
 import           Proj.Models
+import           Proj.Models.Profile
 
-getProfileR :: Handler Html
-getProfileR = do
+getIndexProfileR :: Handler Html
+getIndexProfileR = do
     Entity _ user <- requireAuth
     defaultLayout $ do
         setTitle "Profile"
@@ -22,15 +23,16 @@ getProfileR = do
 
 getEditProfileR :: Handler Html
 getEditProfileR = do
-    _ <- requireAuth
-    ((_, formWidget), encType) <- runFormPost $ renderBootstrap3 BootstrapBasicForm profileForm
+    Entity userId _ <- requireAuth
+    profile <- maybe notFound pure =<< runDB (selectProfile userId)
+    ((_, formWidget), enctype) <- runFormPost $ renderBootstrap3 BootstrapBasicForm $ profileForm profile
     defaultLayout $ do
         setTitle "Edit Profile"
         $(widgetFile "profile/edit")
 
 postEditProfileR :: Handler Html
-postEditProfileR = do
-    redirect EditProfileR
+postEditProfileR =
+    redirect (ProfileR EditProfileR)
 
 data EditProfile = EditProfile
     { epName    :: Text
@@ -42,5 +44,5 @@ profileForm :: Profile -> AForm Handler EditProfile
 profileForm Profile{..} =
     EditProfile
     <$> areq textField (bfs (asText "Name: ")) (Just (userName (entityVal profileUser)))
-    <*> areq checkBoxField (bfs (asText "Mentor: ")) (Just (isJust (profileMentor)))
-    <*> areq checkBoxField (bfs (asText "Learner: "))  (Just (isJust (profileLearner)))
+    <*> areq checkBoxField (bfs (asText "Mentor: ")) (Just (isJust profileMentor))
+    <*> areq checkBoxField (bfs (asText "Learner: "))  (Just (isJust profileLearner))

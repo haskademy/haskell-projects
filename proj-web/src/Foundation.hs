@@ -27,7 +27,6 @@ import qualified Yesod.Core.Unsafe        as Unsafe
 import           Yesod.Default.Util       (addStaticContentExternal)
 
 import           Proj.Models
-import Foundation.Routes
 
 -- | The foundation datatype for your application. This can be a good place to
 -- keep settings and values requiring initialization before your application
@@ -78,9 +77,7 @@ instance Yesod App where
     -- Controls the base of generated URLs. For more information on modifying,
     -- see: https://github.com/yesodweb/yesod/wiki/Overriding-approot
     approot = ApprootRequest $ \app req ->
-        case appRoot $ appSettings app of
-            Nothing   -> getApprootText guessApproot app req
-            Just root -> root
+        fromMaybe (getApprootText guessApproot app req) $ appRoot (appSettings app)
 
     -- Store session data on the client in encrypted cookies,
     -- default session idle timeout is 120 minutes
@@ -116,7 +113,7 @@ instance Yesod App where
                     }
                 , NavbarLeft MenuItem
                     { menuItemLabel = "Profile"
-                    , menuItemRoute = ProfileR
+                    , menuItemRoute = ProfileR IndexProfileR
                     , menuItemAccessCallback = isJust muser
                     }
                 , NavbarRight MenuItem
@@ -164,9 +161,7 @@ instance Yesod App where
                 return Authorized
             AuthR {}  ->
                 return Authorized
-            ProfileR | isJust mauth ->
-                return Authorized
-            EditProfileR | isJust mauth ->
+            ProfileR {} | isJust mauth ->
                 return Authorized
             _ ->
                 return $ Unauthorized "You must be authorized to view this page."
@@ -202,10 +197,16 @@ instance Yesod App where
 -- Define breadcrumbs.
 instance YesodBreadcrumbs App where
   breadcrumb = \case
-    HomeR -> return ("Home", Nothing)
-    ProfileR -> return ("Profile", Just HomeR)
-    EditProfileR -> return ("Edit", Just ProfileR)
-    _ -> return ("Home", Nothing)
+    HomeR ->
+        return ("Home", Nothing)
+    ProfileR subroute ->
+        case subroute of
+            IndexProfileR ->
+                return ("Profile", Just HomeR)
+            EditProfileR ->
+                return ("Edit", Just (ProfileR IndexProfileR))
+    _ ->
+        return ("Home", Nothing)
 
 -- How to run database actions.
 instance YesodPersist App where
@@ -241,7 +242,7 @@ instance YesodAuth App where
                 case mlogin of
                     Just oauthLogin ->
                         pure (Authenticated (oauthLoginUser oauthLogin))
-                    Nothing -> do
+                    Nothing ->
                         runDB $ do
                             now <- liftIO getCurrentTime
                             userId <- insert User
