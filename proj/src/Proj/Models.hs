@@ -72,7 +72,9 @@ Apprenticeship
 data Profile
     = Profile
     { profileUser    :: Entity User
-    , profileLearner :: Entity Learner
-    , profileMentor  :: Entity Mentor
+    , profileLearner :: Maybe (Entity Learner)
+    , profileMentor  :: Maybe (Entity Mentor)
     , profileAdmin   :: Maybe (Entity Admin)
     } deriving (Eq, Show)
+
+loadProfile
