@@ -25,14 +25,32 @@ getEditProfileR :: Handler Html
 getEditProfileR = do
     Entity userId _ <- requireAuth
     profile <- maybe notFound pure =<< runDB (selectProfile userId)
-    ((_, formWidget), enctype) <- runFormPost $ renderBootstrap3 BootstrapBasicForm $ profileForm profile
+    ((_, formWidget), enctype) <- runFormPost $ renderBootstrap3 BootstrapBasicForm $ profileForm (Just profile)
     defaultLayout $ do
         setTitle "Edit Profile"
         $(widgetFile "profile/edit")
 
 postEditProfileR :: Handler Html
-postEditProfileR =
-    redirect (ProfileR EditProfileR)
+postEditProfileR = do
+    Entity userId _ <- requireAuth
+    -- profile <- maybe notFound pure =<< runDB (selectProfile userId)
+    ((formResult, formWidget), enctype) <- runFormPost $ renderBootstrap3 BootstrapBasicForm $ profileForm Nothing
+
+    case formResult of
+        FormSuccess EditProfile {..} -> do
+            runDB $ do
+                update userId [UserName =. epName]
+                if epLearner
+                    then void $ insertUnique (Learner userId)
+                    else deleteWhere [LearnerUser ==. userId]
+                if epMentor
+                    then void $ insertUnique (Mentor userId)
+                    else deleteWhere [MentorUser ==. userId]
+            redirect (ProfileR EditProfileR)
+        _ ->
+            defaultLayout $ do
+                setTitle "Edit Profile"
+                $(widgetFile "profile/edit")
 
 data EditProfile = EditProfile
     { epName    :: Text
@@ -40,9 +58,15 @@ data EditProfile = EditProfile
     , epMentor  :: Bool
     } deriving (Eq, Show)
 
-profileForm :: Profile -> AForm Handler EditProfile
-profileForm Profile{..} =
+profileForm :: Maybe Profile -> AForm Handler EditProfile
+profileForm mprofile =
     EditProfile
-    <$> areq textField (bfs (asText "Name: ")) (Just (userName (entityVal profileUser)))
-    <*> areq checkBoxField (bfs (asText "Mentor: ")) (Just (isJust profileMentor))
-    <*> areq checkBoxField (bfs (asText "Learner: "))  (Just (isJust profileLearner))
+    <$> areq textField
+        (bfs (asText "Name: "))
+        (fmap (userName . entityVal . profileUser) mprofile)
+    <*> areq checkBoxField
+        (bfs (asText "Mentor: "))
+        (fmap (isJust . profileMentor) mprofile)
+    <*> areq checkBoxField
+        (bfs (asText "Learner: "))
+        (fmap (isJust . profileLearner) mprofile)

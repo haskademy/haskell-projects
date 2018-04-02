@@ -30,15 +30,21 @@ Admin
     user    UserId
     created UTCTime
 
+    UniqueAdmin user
+
     deriving Eq Show
 
 Learner
     user    UserId
 
+    UniqueLearner user
+
     deriving Eq Show
 
 Mentor
     user    UserId
+
+    UniqueMentor user
 
     deriving Eq Show
 

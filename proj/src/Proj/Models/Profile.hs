@@ -11,9 +11,9 @@ selectProfile userId =
     fmap (fmap conv . listToMaybe) $
     select $
     from $ \(user `LeftOuterJoin` mentor `LeftOuterJoin` learner `LeftOuterJoin` admin) -> do
-    on (just (user ^. UserId) ==. mentor ?. MentorUser)
-    on (just (user ^. UserId) ==. learner ?. LearnerUser)
     on (just (user ^. UserId) ==. admin ?. AdminUser)
+    on (just (user ^. UserId) ==. learner ?. LearnerUser)
+    on (just (user ^. UserId) ==. mentor ?. MentorUser)
     where_ (user ^. UserId ==. val userId)
     limit 1
     return (user, learner, mentor, admin)

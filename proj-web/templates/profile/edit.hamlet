@@ -6,7 +6,7 @@
         <p>
             there's nothing here yet lol
 
-        <form method=POST action=@{ProfileR EditProfileR} enctype=#{enctype}>
+        <form method=POST action=@{ProfileR EditProfileR} enctype=#{enctype} .form>
             ^{formWidget}
             <button .submit>
                 Submit
