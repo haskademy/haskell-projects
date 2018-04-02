@@ -50,6 +50,7 @@ dependencies:
 - yesod-static           >=1.4.0.3 && <1.6
 - lens-aeson
 - lens
+- blaze-html
 
 # The library contains all of our application code. The executable
 # defined below is just a thin wrapper.

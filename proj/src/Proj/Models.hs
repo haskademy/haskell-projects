@@ -7,8 +7,8 @@ module Proj.Models where
 import           Data.Text           (Text)
 import           Data.Time           (UTCTime)
 import           Database.Persist    (Entity)
-import           Database.Persist.TH (mkPersist, persistLowerCase, share,
-                                      sqlSettings, mkMigrate)
+import           Database.Persist.TH (mkMigrate, mkPersist, persistLowerCase,
+                                      share, sqlSettings)
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 
@@ -30,15 +30,21 @@ Admin
     user    UserId
     created UTCTime
 
+    UniqueAdmin user
+
     deriving Eq Show
 
 Learner
     user    UserId
 
+    UniqueLearner user
+
     deriving Eq Show
 
 Mentor
     user    UserId
+
+    UniqueMentor user
 
     deriving Eq Show
 
@@ -48,7 +54,7 @@ Project
     name        Text
     created     UTCTime
     description Text
-    creater     UserId
+    creator     UserId
 
     deriving Eq Show
 
@@ -72,7 +78,7 @@ Apprenticeship
 data Profile
     = Profile
     { profileUser    :: Entity User
-    , profileLearner :: Entity Learner
-    , profileMentor  :: Entity Mentor
+    , profileLearner :: Maybe (Entity Learner)
+    , profileMentor  :: Maybe (Entity Mentor)
     , profileAdmin   :: Maybe (Entity Admin)
     } deriving (Eq, Show)

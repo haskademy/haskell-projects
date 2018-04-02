@@ -12,20 +12,19 @@ module Foundation where
 
 import           Import.NoFoundation
 
+import           Control.Lens
+import           Data.Aeson.Lens
 import qualified Data.CaseInsensitive     as CI
 import qualified Data.Text.Encoding       as TE
 import           Database.Persist.Sql
 import           Text.Hamlet              (hamletFile)
 import           Text.Jasmine             (minifym)
 import           Yesod.Auth.Dummy
+import           Yesod.Auth.OAuth2        (getUserResponse)
 import           Yesod.Auth.OAuth2.Github
-import           Yesod.Auth.OAuth2 (getUserResponse)
-import           Yesod.Auth.OpenId        (IdentifierType (Claimed), authOpenId)
 import           Yesod.Core.Types         (Logger)
 import qualified Yesod.Core.Unsafe        as Unsafe
 import           Yesod.Default.Util       (addStaticContentExternal)
-import Control.Lens
-import Data.Aeson.Lens
 
 import           Proj.Models
 
@@ -63,7 +62,7 @@ data MenuTypes
 -- This function also generates the following type synonyms:
 -- type Handler = HandlerT App IO
 -- type Widget = WidgetT App IO ()
-mkYesodData "App" $(parseRoutesFile "config/routes")
+mkYesodData "App" $ $(parseRoutesFile "config/routes")
 
 -- | A convenient synonym for creating forms.
 type Form x = Html -> MForm (HandlerT App IO) (FormResult x, Widget)
@@ -78,9 +77,7 @@ instance Yesod App where
     -- Controls the base of generated URLs. For more information on modifying,
     -- see: https://github.com/yesodweb/yesod/wiki/Overriding-approot
     approot = ApprootRequest $ \app req ->
-        case appRoot $ appSettings app of
-            Nothing   -> getApprootText guessApproot app req
-            Just root -> root
+        fromMaybe (getApprootText guessApproot app req) $ appRoot (appSettings app)
 
     -- Store session data on the client in encrypted cookies,
     -- default session idle timeout is 120 minutes
@@ -114,11 +111,11 @@ instance Yesod App where
                     , menuItemRoute = HomeR
                     , menuItemAccessCallback = True
                     }
---                , NavbarLeft $ MenuItem
---                    { menuItemLabel = "Profile"
---                    , menuItemRoute = ProfileR
---                    , menuItemAccessCallback = isJust muser
---                    }
+                , NavbarLeft MenuItem
+                    { menuItemLabel = "Profile"
+                    , menuItemRoute = ProfileR IndexProfileR
+                    , menuItemAccessCallback = isJust muser
+                    }
                 , NavbarRight MenuItem
                     { menuItemLabel = "Login"
                     , menuItemRoute = AuthR LoginR
@@ -151,14 +148,23 @@ instance Yesod App where
     -- The page to be redirected to when authentication is required.
     authRoute _ = Just (AuthR LoginR)
 
-    -- Routes not requiring authentication.
-    isAuthorized route _ =
+    isAuthorized route _isWrite = do
+        mauth <- maybeAuth
         case route of
-            HomeR     -> return Authorized
-            FaviconR  -> return Authorized
-            RobotsR   -> return Authorized
-            StaticR _ -> return Authorized
-            AuthR {}  -> return Authorized
+            HomeR     ->
+                return Authorized
+            FaviconR  ->
+                return Authorized
+            RobotsR   ->
+                return Authorized
+            StaticR _ ->
+                return Authorized
+            AuthR {}  ->
+                return Authorized
+            ProfileR {} | isJust mauth ->
+                return Authorized
+            _ ->
+                return $ Unauthorized "You must be authorized to view this page."
 
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows
@@ -191,8 +197,16 @@ instance Yesod App where
 -- Define breadcrumbs.
 instance YesodBreadcrumbs App where
   breadcrumb = \case
-    HomeR -> return ("Home", Nothing)
-    _ -> return ("Home", Nothing)
+    HomeR ->
+        return ("Home", Nothing)
+    ProfileR subroute ->
+        case subroute of
+            IndexProfileR ->
+                return ("Profile", Just HomeR)
+            EditProfileR ->
+                return ("Edit", Just (ProfileR IndexProfileR))
+    _ ->
+        return ("Home", Nothing)
 
 -- How to run database actions.
 instance YesodPersist App where
@@ -214,7 +228,7 @@ instance YesodAuth App where
     -- Override the above two destinations when a Referer: header is present
     redirectToReferer _ = True
 
-    authenticate creds = do
+    authenticate creds | credsPlugin creds == "github" = do
         let muserId = do
                 resp <- getUserResponse creds
                 resp ^? _Object . ix "id" . _Integral
@@ -228,7 +242,7 @@ instance YesodAuth App where
                 case mlogin of
                     Just oauthLogin ->
                         pure (Authenticated (oauthLoginUser oauthLogin))
-                    Nothing -> do
+                    Nothing ->
                         runDB $ do
                             now <- liftIO getCurrentTime
                             userId <- insert User
@@ -246,6 +260,27 @@ instance YesodAuth App where
                                     userId
                                 }
                             pure (Authenticated userId)
+    authenticate creds | credsPlugin creds == "dummy" = do
+        muser <- runDB $ selectFirst [ UserName ==. credsIdent creds ] []
+        case muser of
+            Nothing -> runDB $ do
+                now <- liftIO getCurrentTime
+                userId <- insert User
+                    { userName = credsIdent creds
+                    , userCreated = now
+                    , userUpdated = now
+                    }
+                _ <- insert OauthLogin
+                    { oauthLoginProvider =
+                        "dummy"
+                    , oauthLoginUser =
+                        userId
+                    }
+                pure (Authenticated userId)
+            Just (Entity userId _) ->
+                pure (Authenticated userId)
+    authenticate _ =
+        pure (ServerError "only github and dummy supported")
 
     -- You can add other plugins like Google Email, email or OAuth here
     authPlugins App{..} =
@@ -282,3 +317,4 @@ unsafeHandler = Unsafe.fakeHandlerGetLogger appLogger
 -- https://github.com/yesodweb/yesod/wiki/Sending-email
 -- https://github.com/yesodweb/yesod/wiki/Serve-static-files-from-a-separate-domain
 -- https://github.com/yesodweb/yesod/wiki/i18n-messages-in-the-scaffolding
+--

@@ -8,3 +8,8 @@
 /robots.txt RobotsR GET
 
 / HomeR GET
+
+-- user management pages
+/profile ProfileR:
+    /       IndexProfileR      GET
+    /edit   EditProfileR  GET POST

@@ -1,0 +1,16 @@
+<div .container>
+    <div .row>
+        <h1 .header>
+            Your Profile
+
+        <h2>
+            Welcome, #{userName user}
+
+        <ul>
+            <li>
+                You joined on #{tshow (userCreated user)}.
+            <li>
+                You last updated your profile on #{tshow (userUpdated user)}
+            <li>
+                <a href=@{ ProfileR EditProfileR }>
+                    Edit your profile
