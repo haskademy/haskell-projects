@@ -63,9 +63,7 @@ data MenuTypes
 -- This function also generates the following type synonyms:
 -- type Handler = HandlerT App IO
 -- type Widget = WidgetT App IO ()
--- mkYesodData "App" $ error $ show $(parseRoutesFile "config/routes")
-
-mkYesodData "App" routes
+mkYesodData "App" $ $(parseRoutesFile "config/routes")
 
 -- | A convenient synonym for creating forms.
 type Form x = Html -> MForm (HandlerT App IO) (FormResult x, Widget)
